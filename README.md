@@ -1,6 +1,6 @@
 # Paint.net plugins by HPW-Dev
 
-Коллеция плагинов для Paint.net от HPW-Dev.
+Коллекция плагинов для Paint.net от HPW-Dev.
 
 ### Donate
 [Счета для доната](donate.md)
