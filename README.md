@@ -9,5 +9,3 @@
 © 2024, [HPW-dev](mailto:hpwdev0@gmail.com)
 
 Лицензия на код: [Apache 2.0](LICENSE.txt)
-
-Права на сторонние библиотеки и ресурсы принадлежат тем, кому они принадлежат ([см. NOTICE.txt](NOTICE.txt))
