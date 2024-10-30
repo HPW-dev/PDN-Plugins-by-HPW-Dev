@@ -1,0 +1,8 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Minimal-Red-3
+;Description: 
+;Colors: 3
+FFfefefe
+FFed3237
+FF373435

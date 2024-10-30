@@ -1,0 +1,9 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: CherryMelon
+;Description: Made by WildLeoKnight
+;Colors: 4
+FFfcdeea
+FFff4d6d
+FF265935
+FF012824

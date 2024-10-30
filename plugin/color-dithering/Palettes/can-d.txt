@@ -1,0 +1,39 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Can-D
+;Description: 
+;Colors: 34
+FF2b0a2b
+FF3b2023
+FF3b3433
+FF572a2a
+FF5e3a4b
+FF703e36
+FF94593e
+FFbd6d13
+FFb88b54
+FFf0e09e
+FFd4c977
+FF77bd57
+FF4d943c
+FF267354
+FF136935
+FF155249
+FF203d2f
+FF40283e
+FF484c57
+FF635a70
+FF8f8f88
+FFe08f82
+FFd15858
+FFbd404f
+FF9e3c5b
+FF943535
+FF802167
+FF662b35
+FF56648a
+FF457eb3
+FF379fa8
+FF64aab2
+FF71bfd9
+FF83d0cd

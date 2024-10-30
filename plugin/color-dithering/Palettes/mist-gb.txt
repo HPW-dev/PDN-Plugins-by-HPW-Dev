@@ -1,0 +1,9 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Mist GB
+;Description: 
+;Colors: 4
+FF2d1b00
+FF1e606e
+FF5ab9a8
+FFc4f0c2

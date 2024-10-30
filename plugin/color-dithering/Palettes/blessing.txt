@@ -1,0 +1,10 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Blessing
+;Description: Palette created by <a target="_blank" href="https://twitter.com/MarukiHurakami">Maruki</a>.
+;Colors: 5
+FF74569b
+FF96fbc7
+FFf7ffae
+FFffb3cb
+FFd8bfd8

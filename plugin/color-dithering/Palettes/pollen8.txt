@@ -1,0 +1,13 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Pollen8
+;Description: 
+;Colors: 8
+FF73464c
+FFab5675
+FFee6a7c
+FFffa7a5
+FFffe07e
+FFffe7d6
+FF72dcbb
+FF34acba

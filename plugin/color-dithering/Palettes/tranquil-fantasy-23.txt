@@ -1,0 +1,28 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Tranquil Fantasy 23
+;Description: Created for a <a target="_blank" href="http://tiles.fydo.net/quilt/24">Fydo quilt</a>.
+;Colors: 23
+FFa52d27
+FFc96d45
+FFd1ca80
+FFa29d6b
+FF836b3f
+FF63492c
+FF413325
+FF28221f
+FF3a3b3d
+FF5f6367
+FF869598
+FFacc2c3
+FFd4eded
+FF97b58a
+FF65845c
+FF3a5941
+FF223a30
+FF503b68
+FF855b69
+FFdfb9ca
+FFacdcf1
+FF7ca8d5
+FF4c6ead

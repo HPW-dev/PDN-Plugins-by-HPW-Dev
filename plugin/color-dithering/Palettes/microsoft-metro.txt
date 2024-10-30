@@ -1,0 +1,22 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Microsoft Metro
+;Description: Microsoft's <a href="https://www.w3schools.com/colors/colors_metro.asp" target="_blank">Metro</a> color pallet, first used on Windows 8.
+;Colors: 17
+FF99b433
+FF00a300
+FF1e7145
+FFff0097
+FF9f00a7
+FF7e3878
+FF603cba
+FF1d1d1d
+FF00aba9
+FFeff4ff
+FF2d89ef
+FF2b5797
+FFffc40d
+FFe3a21a
+FFda532c
+FFee1111
+FFb91d47

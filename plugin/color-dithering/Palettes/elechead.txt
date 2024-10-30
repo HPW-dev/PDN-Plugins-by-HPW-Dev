@@ -1,0 +1,9 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: ElecHead
+;Description: Palette of the unique platformer <a href="https://namatakahashi.itch.io/elechead" target="_blank">ElecHead</a>.
+;Colors: 4
+FF08242b
+FF1d7c95
+FFfda000
+FFffffff

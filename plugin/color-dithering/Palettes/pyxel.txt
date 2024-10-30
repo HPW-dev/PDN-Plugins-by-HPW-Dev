@@ -1,0 +1,21 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: PYXEL
+;Description: Palette for Pyxel framework: https://github.com/kitao/pyxel<br />
+;Colors: 16
+FF000000
+FF2b335f
+FF7e2072
+FF19959c
+FF8b4852
+FF395c98
+FFa9c1ff
+FFeeeeee
+FFd4186c
+FFd38441
+FFe9c35b
+FFa3a3a3
+FF70c6a9
+FF7696de
+FFff9798
+FFedc7b0

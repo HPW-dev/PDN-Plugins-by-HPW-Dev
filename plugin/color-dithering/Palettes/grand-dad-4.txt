@@ -1,0 +1,9 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Grand Dad 4
+;Description: Created by <a target="_blank" href="https://twitter.com/Starbound64">Starlane</a>
+;Colors: 4
+FF4c1c2d
+FFd23c4e
+FF5fb1f5
+FFeaf5fa

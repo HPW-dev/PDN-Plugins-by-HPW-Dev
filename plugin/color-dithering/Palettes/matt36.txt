@@ -1,0 +1,41 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: MATT36
+;Description: Version 2 of a master palette I created several months ago. Very versatile. 
+;Colors: 36
+FF3d3957
+FF242b4a
+FF52216e
+FF911d55
+FFbf2651
+FFf54f4f
+FFff8766
+FFffac7f
+FFffd3a3
+FFe6a3a3
+FF995c95
+FF524a63
+FF728794
+FFa7b8c2
+FFc6dbde
+FFdfeded
+FF99c2db
+FF5d8bb3
+FF4d6a94
+FF405578
+FF357985
+FF4c8f82
+FF78b392
+FFb5e0ba
+FFf0ece2
+FFdfd3c3
+FFc7b198
+FF997d76
+FF57404e
+FF372840
+FF66333d
+FF9c4f41
+FFb3785d
+FFd6a57a
+FFe6cc8a
+FFfafac3

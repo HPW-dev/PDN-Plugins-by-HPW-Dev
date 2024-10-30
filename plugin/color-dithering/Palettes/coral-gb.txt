@@ -1,0 +1,9 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: CORAL GB
+;Description: my first palette :)
+;Colors: 4
+FF6c6f7d
+FFff6b6c
+FFffc145
+FFf0eff4

@@ -1,0 +1,24 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: New 
+;Description: 
+;Colors: 19
+FF3a224f
+FF4e2557
+FF73326a
+FFa34474
+FFc7506b
+FFe3755f
+FFed9e70
+FFfcc88d
+FFffd7a3
+FFffefc9
+FFf0eba8
+FFcff291
+FFa0de85
+FF69c976
+FF50ab76
+FF36777a
+FF2e5c6b
+FF223d54
+FF1f2e52
