@@ -1,11 +1,11 @@
 // Name: Desaturator+
 // Submenu: Color
-// Author: A87
+// Author: HPW-Dev
 // Title: Desaturator+
 // Version: 1.1.0
 // Desc: Обесцвечивание картинки
 // Keywords: Desaturation|Decolorization|grayscale
-// URL:
+// URL: hpwdev0@gmail.com
 // Help:
 #region UICode
 DoubleSliderControl g_gamma_r = 1; // [0,2.6] Gamma Red

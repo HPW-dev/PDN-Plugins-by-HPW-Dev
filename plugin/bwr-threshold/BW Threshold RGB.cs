@@ -1,11 +1,11 @@
 // Name: BW Threshold RGB
 // Submenu: Color
-// Author: A87
+// Author: HPW-Dev
 // Title: BW color correction (RGB version)
 // Version: 1.0
 // Desc: for comix
 // Keywords: BW|color|desaturation|threshold
-// URL: AtarID76@yandex.ru
+// URL: hpwdev0@gmail.com
 // Help: 2024. Free
 
 // Force Aliased Selection

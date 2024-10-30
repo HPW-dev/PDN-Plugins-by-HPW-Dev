@@ -5,7 +5,7 @@
 // Version: 2.1
 // Desc: for comix
 // Keywords: BW|RGB|red|color|desaturation|threshold
-// URL: HPW-Dev
+// URL: hpwdev0@gmail.com
 // Help: 2024. Free
 
 // Force Aliased Selection
