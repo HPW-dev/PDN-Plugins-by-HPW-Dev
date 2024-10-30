@@ -1,0 +1,7 @@
+﻿.vscode/**
+**/delme*
+**/ignore*
+*.zip
+*.png
+*.exe
+*.code-workspace

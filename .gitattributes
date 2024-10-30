@@ -1,0 +1,27 @@
+# default
+* text eol=crlf
+
+*.bat text eol=crlf
+*.txt text eol=auto
+*.cs text
+
+# Denote all files that are truly binary and should not be modified.
+*.a binary
+*.o binary
+*.so binary
+*.dat binary
+*.bin binary
+*.png binary
+*.gif binary
+*.webp binary
+*.zip binary
+*.exe binary
+*.elf binary
+*.elf32 binary
+*.elf64 binary
+*.dll binary
+*.xz binary
+*.zst binary
+*.lib binary
+*.jpg binary
+*.ods binary
