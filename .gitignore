@@ -1,6 +1,7 @@
 ﻿.vscode/**
 **/delme*
 **/ignore*
+Release/
 *.zip
 *.png
 *.exe
