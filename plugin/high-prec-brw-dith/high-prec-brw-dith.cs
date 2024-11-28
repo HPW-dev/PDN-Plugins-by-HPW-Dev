@@ -248,6 +248,10 @@ unsafe ColorBgra pixel_unsafe(ColorBgra* src, int x, int y, int w) {
   return src[y * w + x];
 }
 
+unsafe double threshold(double src) {
+  return src >= g_threshold ? 1.0 : 0.0;;
+}
+
 // обрабатывает цвета в многопотоке
 unsafe ColorBgra multithread_processing(ColorBgra src, int x, int y) {
   var local_color = to_local_color(src);
@@ -255,7 +259,7 @@ unsafe ColorBgra multithread_processing(ColorBgra src, int x, int y) {
   switch ((Dithering_t)g_dithering_t) {
     default:
     case Dithering_t.none: break;
-    case Dithering_t.threshold: local_color.value = local_color.value >= g_threshold ? 1.0 : 0.0; break;
+    case Dithering_t.threshold: local_color.value = threshold(local_color.value); break;
     case Dithering_t.bayer_16x16: /*TODO*/ break;
     case Dithering_t.hline: /*TODO*/ break;
     case Dithering_t.noise: /*TODO*/ break;
