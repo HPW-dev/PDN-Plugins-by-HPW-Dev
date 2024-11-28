@@ -11,7 +11,7 @@
 CheckboxControl g_use_red_channel = true; // красный цвет
 ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
 ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
-ListBoxControl g_destaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
+ListBoxControl g_Desaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
 DoubleSliderControl g_threshold = 0.5; // [0,1] порог белого
 #endregion
 
@@ -166,8 +166,38 @@ unsafe double output_gamma_process(double src) {
 // конвертирует в серые оттенки
 unsafe double desaturate(double r, double g, double b) {
   double ret;
-  // TODO
-  ret = (r + g + b) / 3.0;
+
+  switch ((Desaturation_t)g_Desaturation_t) {
+    case Desaturation_t.bt2001: { ret = r * 0.2627 + g * 0.6780 + b * 0.0593; break; }
+    default:
+    case Desaturation_t.bt709: { ret = r * 0.2126 + g * 0.7152 + b * 0.0722; break; }
+    case Desaturation_t.bt601: { ret = r * 0.299 + g * 0.587 + b * 0.114; break; }
+    case Desaturation_t.R035_G05_B015: { ret = r * 0.35 + g * 0.5 + b * 0.15; break; }
+    case Desaturation_t.euclide: { ret = Math.Sqrt(Math.Pow(r, 2.0) + Math.Pow(g, 2.0) + Math.Pow(b, 2.0)); break; }
+    case Desaturation_t.min: {
+      ret = Math.Max(r, g);
+      ret = Math.Max(ret, b);
+      break;
+    }
+    case Desaturation_t.max: {
+      ret = Math.Min(r, g);
+      ret = Math.Min(ret, b);
+      break;
+    }
+    case Desaturation_t.minmax: {
+      var A = Math.Max(r, g);
+      A = Math.Max(A, b);
+      var B = Math.Min(r, g);
+      B = Math.Min(B, b);
+      ret = (A + B) * 0.5;
+      break;
+    }
+    case Desaturation_t.average: { ret = (r + g + b) / 3.0; break; }
+    case Desaturation_t.only_red: { ret = r; break; }
+    case Desaturation_t.only_green: { ret = g; break; }
+    case Desaturation_t.only_blue: { ret = b; break; }
+  }
+
   return ret;
 }
 
