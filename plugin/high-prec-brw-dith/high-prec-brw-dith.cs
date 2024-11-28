@@ -10,16 +10,50 @@
 #region UICode
 CheckboxControl g_use_red_channel = true; // красный цвет
 CheckboxControl g_use_gamma_correction = true; // гамма коррекция
+ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
+ListBoxControl g_destaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
 #endregion
 
-enum Dummy {
-  TEST_A = 0,
-  TEST_B,
+// для выбора алгоритма дизеринга
+enum Dithering_t {
+  none = 0,        // без дизера
+  threshold,       // грубый порог
+  simple_error,    // одномерное распределение ошибки
+  atkinson,
+  jjn,             // Jarvis Judice Ninke
+  bayer_16x16,
+  hline,           // горизонтальные полосы
+  noise,           // случайный шум
+  blue_noise,
 }
 
-private static Dictionary<Dummy, bool> test_dict = new Dictionary<Dummy, bool> {
-  {Dummy.TEST_A, true},
-  {Dummy.TEST_B, false},
+// режимы вычисления яркости
+enum Desaturation_t {
+  bt709 = 0,
+  R035_G05_B015,
+  bt601,
+  bt2001,
+  average,
+  min,
+  minmax,
+  max,
+  only_red,
+  only_green,
+  only_blue,
+  euclide,
+}
+
+// какие дизеринги можно юзать в многопотоке
+private static Dictionary<Dithering_t, bool> MULTITHREAD_CHECK = new Dictionary<Dithering_t, bool> {
+  {Dithering_t.none, true},
+  {Dithering_t.threshold, true},
+  {Dithering_t.simple_error, false},
+  {Dithering_t.atkinson, false},
+  {Dithering_t.jjn, false},
+  {Dithering_t.bayer_16x16, true},
+  {Dithering_t.hline, true},
+  {Dithering_t.noise, true},
+  {Dithering_t.blue_noise, true},
 };
 
 unsafe double clamp(double val, double min, double max) {
@@ -54,9 +88,18 @@ unsafe double to_srgb_space(double linear_color) {
   return (1.055 * Math.Pow(linear_color, 1.0 / 2.4)) - 0.055;
 }
 
+// получить пиксель с картинки без проверки выхода индексов за границы
+unsafe ColorBgra pixel_unsafe(ColorBgra* src, int x, int y, int w) {
+  return src[y * w + x];
+}
+
 // обрабатывает цвета в многопотоке
 unsafe ColorBgra multithread_processing(ColorBgra src) {
-  return src;
+  //return src; // TODO
+  var color = new ColorBgra();
+  color.A = 255;
+  color.R = 255;
+  return color;
 }
 
 // обрабатывает цвета последовательно
@@ -69,7 +112,16 @@ unsafe void single_core_processing(ColorBgra* dst, ColorBgra* src, int w, int h)
     dst++;
   }
   */
-  // TODO проверять какой алгоритм сингл тредный
+
+  for (int i = 0; i < w * h; i++) {
+    //*dst_p = single_core_processing(*src_p);
+    var color = new ColorBgra();
+    color.A = 255;
+    color.B = 255;
+    *dst = color;
+    src++;
+    dst++;
+  }
 }
 
 protected override void OnDispose(bool disposing) {
@@ -80,12 +132,20 @@ protected override void OnDispose(bool disposing) {
 }
 
 unsafe void PreRender(Surface dst, Surface src) {
+  // проверить что эффект может работать в одном потоке
+  if (MULTITHREAD_CHECK[(Dithering_t)g_dithering_t])
+    return;
+
   ColorBgra* src_p = src.GetPointPointerUnchecked(0, 0);
   ColorBgra* dst_p = dst.GetPointPointerUnchecked(0, 0);
   single_core_processing(dst_p, src_p, src.Width, src.Height);
 }
 
-unsafe void Render(Surface dst, Surface src, Rectangle rect) { 
+unsafe void Render(Surface dst, Surface src, Rectangle rect) {
+  // проверить что эффект может работать в многопотоке
+  if (!MULTITHREAD_CHECK[(Dithering_t)g_dithering_t])
+    return;
+
   for (int y = rect.Top; y < rect.Bottom; y++) {
     if (IsCancelRequested) return;
 
