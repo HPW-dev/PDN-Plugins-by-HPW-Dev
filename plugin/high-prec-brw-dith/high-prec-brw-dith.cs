@@ -13,6 +13,8 @@ ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|l
 ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
 ListBoxControl g_Desaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
 DoubleSliderControl g_threshold = 0.5; // [0,1] порог белого
+DoubleSliderControl g_dither_offset = 0.0; // [-0.5,0.5] смещение
+DoubleSliderControl g_dither_amplify = 1.0; // [0,2] усиление
 #endregion
 
 // режимы гамма коррекции
@@ -220,7 +222,7 @@ unsafe Local_color to_local_color(ColorBgra src) {
 }
 
 unsafe ColorBgra to_bgra(Local_color src) {
-  double luma = output_gamma_process(src.value);
+  double luma = src.value;
   var ret = new ColorBgra();
   
   // определить оттенки 
@@ -252,17 +254,23 @@ unsafe double threshold(double src) {
   return src >= g_threshold ? 1.0 : 0.0;;
 }
 
+unsafe double noise_dither(double src) {
+  Random generator = new Random();
+  double add = (generator.NextDouble() - 0.5 - g_dither_offset) * g_dither_amplify;
+  return threshold(output_gamma_process(src + add));
+}
+
 // обрабатывает цвета в многопотоке
 unsafe ColorBgra multithread_processing(ColorBgra src, int x, int y) {
   var local_color = to_local_color(src);
 
   switch ((Dithering_t)g_dithering_t) {
     default:
-    case Dithering_t.none: break;
-    case Dithering_t.threshold: local_color.value = threshold(local_color.value); break;
+    case Dithering_t.none: local_color.value = output_gamma_process(local_color.value); break;
+    case Dithering_t.threshold: local_color.value = threshold(output_gamma_process(local_color.value)); break;
     case Dithering_t.bayer_16x16: /*TODO*/ break;
     case Dithering_t.hline: /*TODO*/ break;
-    case Dithering_t.noise: /*TODO*/ break;
+    case Dithering_t.noise: local_color.value = noise_dither(local_color.value); break;
     case Dithering_t.blue_noise: /*TODO*/ break;
   }
 
