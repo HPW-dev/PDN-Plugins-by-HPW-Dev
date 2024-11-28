@@ -9,7 +9,7 @@
 // Help:
 #region UICode
 CheckboxControl g_use_red_channel = true; // красный цвет
-ListBoxControl g_gamma_correction_t = 0; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
+ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
 ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
 ListBoxControl g_destaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
 DoubleSliderControl g_threshold = 0.5; // [0,1] порог белого
@@ -221,6 +221,17 @@ unsafe ColorBgra pixel_unsafe(ColorBgra* src, int x, int y, int w) {
 // обрабатывает цвета в многопотоке
 unsafe ColorBgra multithread_processing(ColorBgra src, int x, int y) {
   var local_color = to_local_color(src);
+
+  switch ((Dithering_t)g_dithering_t) {
+    default:
+    case Dithering_t.none: break;
+    case Dithering_t.threshold: local_color.value = local_color.value >= g_threshold ? 1.0 : 0.0; break;
+    case Dithering_t.bayer_16x16: /*TODO*/ break;
+    case Dithering_t.hline: /*TODO*/ break;
+    case Dithering_t.noise: /*TODO*/ break;
+    case Dithering_t.blue_noise: /*TODO*/ break;
+  }
+
   return to_bgra(local_color);
 }
 
