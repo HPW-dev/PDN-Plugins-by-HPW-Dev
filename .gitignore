@@ -4,5 +4,6 @@
 Release/
 *.zip
 *.png
+!plugin/**/*.png
 *.exe
 *.code-workspace
