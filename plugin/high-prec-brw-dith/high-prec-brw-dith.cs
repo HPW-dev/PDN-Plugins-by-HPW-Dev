@@ -2,14 +2,17 @@
 // Submenu: Color
 // Author: HPW-Dev
 // Title: Highp BRW Dither
-// Version: 1.0.0
+// Version: 1.1.0
 // Desc: Высокоточный дизеринг ЧБ и ЧКБ
 // Keywords: Desaturation|Decolorization|1bit|monochrome|BW|BWR|Dither|Dithering
 // URL: hpwdev0@gmail.com
 // Help:
 #region UICode
 CheckboxControl g_use_red_channel = true; // красный цвет
+CheckboxControl g_normalize_red = false; // нормализация красного
 DoubleSliderControl g_red_hue_threshold = 10; // [0,360] порог цветности красного 
+DoubleSliderControl g_red_s_threshold = 0.57; // [0,1] порог насыщенности красного 
+DoubleSliderControl g_red_v_threshold = 0.699; // [0,1] порог яркости красного 
 ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
 //ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
 ListBoxControl g_dithering_t = 2; // дизеринг|none|threshold|Atkinson|JJN|noise
@@ -277,9 +280,9 @@ unsafe Local_color_mode get_color_mode(double r, double g, double b) {
   if (g_use_red_channel) {
     var hsv = rgb2hsv(r, g, b);
     if (hsv.h <= g_red_hue_threshold || hsv.h >= (360.0 - g_red_hue_threshold)) {
-      if (hsv.s >= 1.0)
+      if (hsv.s > g_red_s_threshold)
         return Local_color_mode.black_red;
-      if (hsv.v >= 1.0)
+      if (hsv.v > g_red_v_threshold)
         return Local_color_mode.red_white;
     }
   }
@@ -301,7 +304,10 @@ unsafe Local_color to_local_color(ColorBgra src) {
   g = input_gamma_process(g);
   b = input_gamma_process(b);
 
-  ret.value = desaturate(r, g, b);
+  if (g_normalize_red && ret.mode != Local_color_mode.bw)
+    ret.value = r;
+  else
+    ret.value = desaturate(r, g, b);
   ret.value = brightness(ret.value);
   ret.value = contrast(ret.value);
   ret.value = gamma(ret.value);
