@@ -10,7 +10,8 @@
 #region UICode
 CheckboxControl g_use_red_channel = true; // красный цвет
 ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
-ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
+//ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
+ListBoxControl g_dithering_t = 2; // дизеринг|none|threshold|Atkinson|JJN|noise
 ListBoxControl g_Desaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
 DoubleSliderControl g_threshold = 0.5; // [0,1] порог белого
 DoubleSliderControl g_dither_offset = 0.0; // [-0.5,0.5] смещение
@@ -32,13 +33,13 @@ enum Gamma_correction_t {
 enum Dithering_t {
   none = 0,        // без дизера
   threshold,       // грубый порог
-  simple_error,    // одномерное распределение ошибки
+  //simple_error,    // одномерное распределение ошибки
   atkinson,
   jjn,             // Jarvis Judice Ninke
-  bayer_16x16,
-  hline,           // горизонтальные полосы
+  //bayer_16x16,
+  //hline,           // горизонтальные полосы
   noise,           // случайный шум
-  blue_noise,
+  //blue_noise,
 }
 
 // режимы вычисления яркости
@@ -61,13 +62,13 @@ enum Desaturation_t {
 private static Dictionary<Dithering_t, bool> MULTITHREAD_CHECK = new Dictionary<Dithering_t, bool> {
   {Dithering_t.none, true},
   {Dithering_t.threshold, true},
-  {Dithering_t.simple_error, false},
+  //{Dithering_t.simple_error, false},
   {Dithering_t.atkinson, false},
   {Dithering_t.jjn, false},
-  {Dithering_t.bayer_16x16, true},
-  {Dithering_t.hline, true},
+  //{Dithering_t.bayer_16x16, true},
+  //{Dithering_t.hline, true},
   {Dithering_t.noise, true},
-  {Dithering_t.blue_noise, true},
+  //{Dithering_t.blue_noise, true},
 };
 
 // цвет: чб, чёрный-красный, красный-белый
@@ -250,6 +251,10 @@ unsafe ColorBgra pixel_unsafe(ColorBgra* src, int x, int y, int w) {
   return src[y * w + x];
 }
 
+unsafe void set_pixel_unsafe(Local_color color, ColorBgra* dst, int x, int y, int w) {
+  dst[y * w + x] = to_bgra(color);
+}
+
 unsafe double threshold(double src) {
   return src >= g_threshold ? 1.0 : 0.0;;
 }
@@ -268,25 +273,54 @@ unsafe ColorBgra multithread_processing(ColorBgra src, int x, int y) {
     default:
     case Dithering_t.none: local_color.value = output_gamma_process(local_color.value); break;
     case Dithering_t.threshold: local_color.value = threshold(output_gamma_process(local_color.value)); break;
-    case Dithering_t.bayer_16x16: /*TODO*/ break;
-    case Dithering_t.hline: /*TODO*/ break;
+    //case Dithering_t.bayer_16x16: /*TODO*/ break;
+    //case Dithering_t.hline: /*TODO*/ break;
     case Dithering_t.noise: local_color.value = noise_dither(local_color.value); break;
-    case Dithering_t.blue_noise: /*TODO*/ break;
+    //case Dithering_t.blue_noise: /*TODO*/ break;
   }
 
   return to_bgra(local_color);
 }
 
+unsafe void dither_atkinson(ColorBgra* dst, ColorBgra* src, int w, int h) {
+  int sz = w * h;
+  Local_color[] buffer = new Local_color[sz];
+  for (int i = 0; i < sz; i++)
+    buffer[i] = to_local_color(src[i]);
+
+  for (int y = 0; y < h-2; y++) {
+    if (IsCancelRequested) return;
+
+    for (int x = 1; x < w-2; x++) {
+      var old_pixel = buffer[y * w + x];
+      var new_pixel = old_pixel;
+      new_pixel.value = threshold(output_gamma_process(old_pixel.value));
+      buffer[y * w + x] = new_pixel;
+      double q_error = old_pixel.value - new_pixel.value;
+      buffer[(y+0) * w + (x+2)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+      buffer[(y+0) * w + (x+1)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x-1)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x+0)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x+1)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x+0)].value += q_error * 0.125 * g_dither_amplify + g_dither_offset;
+    }
+  }
+
+  for (int i = 0; i < sz; i++)
+    dst[i] = to_bgra(buffer[i]);
+}
+
+unsafe void dither_jjn(ColorBgra* dst, ColorBgra* src, int w, int h) {
+  // TODO
+}
+
 // обрабатывает цвета последовательно
 unsafe void single_core_processing(ColorBgra* dst, ColorBgra* src, int w, int h) {
-  /*
-  for (int i = 0; i < sz; i++) {
-    //*dst_p = single_core_processing(*src_p);
-    *dst = *src;
-    src++;
-    dst++;
+  switch ((Dithering_t)g_dithering_t) {
+    default:
+    case Dithering_t.atkinson: dither_atkinson(dst, src, w, h); break;
+    case Dithering_t.jjn: dither_jjn(dst, src, w, h); break;
   }
-  */
 }
 
 protected override void OnDispose(bool disposing) {
