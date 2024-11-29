@@ -311,7 +311,37 @@ unsafe void dither_atkinson(ColorBgra* dst, ColorBgra* src, int w, int h) {
 }
 
 unsafe void dither_jjn(ColorBgra* dst, ColorBgra* src, int w, int h) {
-  // TODO
+  int sz = w * h;
+  Local_color[] buffer = new Local_color[sz];
+  for (int i = 0; i < sz; i++)
+    buffer[i] = to_local_color(src[i]);
+
+  for (int y = 0; y < h-2; y++) {
+    if (IsCancelRequested) return;
+
+    for (int x = 1; x < w-2; x++) {
+      var old_pixel = buffer[y * w + x];
+      var new_pixel = old_pixel;
+      new_pixel.value = threshold(output_gamma_process(old_pixel.value));
+      buffer[y * w + x] = new_pixel;
+      double q_error = old_pixel.value - new_pixel.value;
+      buffer[(y+0) * w + (x+1)].value += q_error * (7.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+0) * w + (x+2)].value += q_error * (5.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x-2)].value += q_error * (3.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x-1)].value += q_error * (5.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x+0)].value += q_error * (7.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x+1)].value += q_error * (5.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+1) * w + (x+2)].value += q_error * (3.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x-2)].value += q_error * (1.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x-1)].value += q_error * (3.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x+0)].value += q_error * (5.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x+1)].value += q_error * (3.0/48.0) * g_dither_amplify + g_dither_offset;
+      buffer[(y+2) * w + (x+2)].value += q_error * (1.0/48.0) * g_dither_amplify + g_dither_offset;
+    }
+  }
+
+  for (int i = 0; i < sz; i++)
+    dst[i] = to_bgra(buffer[i]);
 }
 
 // обрабатывает цвета последовательно
