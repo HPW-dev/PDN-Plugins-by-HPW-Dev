@@ -9,6 +9,7 @@
 // Help:
 #region UICode
 CheckboxControl g_use_red_channel = true; // красный цвет
+DoubleSliderControl g_red_hue_threshold = 10; // [0,360] порог цветности красного 
 ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|linear -> sRGB|sRGB -> linear|input sRGB|input linear|output sRGB|output linear
 //ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
 ListBoxControl g_dithering_t = 2; // дизеринг|none|threshold|Atkinson|JJN|noise
@@ -207,19 +208,84 @@ unsafe double desaturate(double r, double g, double b) {
   return ret;
 }
 
-
+// якрость
 unsafe double brightness(double src) {
   return src + g_brightness;
 }
 
+// контраст
 unsafe double contrast(double src) {
   return (src - 0.5) * g_contrast + 0.5;
 }
 
+// гамма
 unsafe double gamma(double src) {
   return Math.Pow(src, 1.0 / g_gamma);
 }
 
+public struct Hsv {
+  public double h;
+  public double s;
+  public double v;
+}
+
+Hsv rgb2hsv(double r, double g, double b) {
+  double min;
+  min =   r < g ? r   : g;
+  min = min < b ? min : b;
+
+  double max;
+  max =    r > g ? r   : g;
+  max = max  > b ? max : b;
+
+  Hsv ret = new Hsv();
+  ret.v = max; // v
+  double delta = max - min;
+
+  if (delta < 0.000001) {
+    ret.s = 0;
+    ret.h = 0; // undefined, maybe nan?
+    return ret;
+  }
+
+  if( max > 0.0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+    ret.s = (delta / max); // s
+  } else {
+    // if max is 0, then r = g = b = 0              
+    // s = 0, h is undefined
+    ret.s = 0.0;
+    ret.h = 0.0; // its now undefined
+    return ret;
+  }
+
+  if (r >= max) // > is bogus, just keeps compilor happy
+    ret.h = (g - b) / delta; // between yellow & magenta
+  else if (g >= max)
+    ret.h = 2.0 + (b - r) / delta; // between cyan & yellow
+  else
+    ret.h = 4.0 + (r - g) / delta; // between magenta & cyan
+
+  ret.h *= 60.0; // degrees
+
+  if(ret.h < 0.0)
+    ret.h += 360.0;
+
+  return ret;
+}
+
+unsafe Local_color_mode get_color_mode(double r, double g, double b) {
+  if (g_use_red_channel) {
+    var hsv = rgb2hsv(r, g, b);
+    if (hsv.h <= g_red_hue_threshold || hsv.h >= (360.0 - g_red_hue_threshold)) {
+      if (hsv.s >= 1.0)
+        return Local_color_mode.black_red;
+      if (hsv.v >= 1.0)
+        return Local_color_mode.red_white;
+    }
+  }
+    
+  return Local_color_mode.bw;
+}
 
 unsafe Local_color to_local_color(ColorBgra src) {
   var ret = new Local_color();
@@ -228,7 +294,7 @@ unsafe Local_color to_local_color(ColorBgra src) {
   double g = b2d(src.G);
   double r = b2d(src.R);
 
-  // todo check red color
+  ret.mode = get_color_mode(r, g, b);
 
   // gamma processing:
   r = input_gamma_process(r);
@@ -255,11 +321,11 @@ unsafe ColorBgra to_bgra(Local_color src) {
     ret.B = 0;
     ret.G = 0;
     ret.R = d2b(luma);
-  } else {
+  } else { // Local_color_mode.red_white
     // TODO red-white
     ret.B = d2b(luma);
     ret.G = d2b(luma);
-    ret.R = d2b(luma);
+    ret.R = d2b(255);
   }
   
   ret.A = 255;
