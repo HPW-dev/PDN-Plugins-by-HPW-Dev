@@ -13,6 +13,9 @@ ListBoxControl g_gamma_correction_t = 1; // гамма коррекция|none|l
 //ListBoxControl g_dithering_t = 3; // дизеринг|none|threshold|simple error|Atkinson|JJN|Bayer 16x16|H-Line|noise|blue noise
 ListBoxControl g_dithering_t = 2; // дизеринг|none|threshold|Atkinson|JJN|noise
 ListBoxControl g_Desaturation_t = 0; // режим обесцвечивания|bt.709|0.35 0.5 0.15|bt.601|bt.2001|average|min|MinMax|max|red only|green only|blue only|Euclide
+DoubleSliderControl g_brightness = 0.0; // [-1,1] яркость
+DoubleSliderControl g_contrast = 1.0; // [0,3] контраст
+DoubleSliderControl g_gamma = 1.0; // [0,3] гамма
 DoubleSliderControl g_threshold = 0.5; // [0,1] порог белого
 DoubleSliderControl g_dither_offset = 0.0; // [-0.5,0.5] смещение
 DoubleSliderControl g_dither_amplify = 1.0; // [0,2] усиление
@@ -204,6 +207,20 @@ unsafe double desaturate(double r, double g, double b) {
   return ret;
 }
 
+
+unsafe double brightness(double src) {
+  return src + g_brightness;
+}
+
+unsafe double contrast(double src) {
+  return (src - 0.5) * g_contrast + 0.5;
+}
+
+unsafe double gamma(double src) {
+  return Math.Pow(src, 1.0 / g_gamma);
+}
+
+
 unsafe Local_color to_local_color(ColorBgra src) {
   var ret = new Local_color();
 
@@ -219,6 +236,9 @@ unsafe Local_color to_local_color(ColorBgra src) {
   b = input_gamma_process(b);
 
   ret.value = desaturate(r, g, b);
+  ret.value = brightness(ret.value);
+  ret.value = contrast(ret.value);
+  ret.value = gamma(ret.value);
   return ret;
 }
 
