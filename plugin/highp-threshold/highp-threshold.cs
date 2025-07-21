@@ -17,7 +17,12 @@ DoubleSliderControl brightness_val = 0; // [-1,1] Brightness
 DoubleSliderControl contrast_val = 1; // [0,3] Contrast
 CheckboxControl post_inversion_val = false; // Post-inversion
 ListBoxControl post_gamma_mode = 0; // Gamma post-processing|None|To 2.2|From 2.2
+CheckboxControl use_threashold_val = true; // Use B/W threasholding
+DoubleSliderControl dither_val = 0.0; // [0,1] Dithering power
+DoubleSliderControl threashold_val = 0.5; // [0,1] Threshold
 #endregion
+
+Random rnd; // рандом для дизеринга
 
 // режимы вычисления яркости
 enum desaturation_mode_t {
@@ -121,16 +126,38 @@ unsafe double clamp(double val, double min, double max) {
   return val;
 }
 
+// ЧБ порог
+unsafe double threshold(double luma, double val) {
+  if (luma > val)
+    return 1.0;
+  return 0.0;
+}
+
+// рандомный дизеринг
+unsafe double random_dither(double luma, double val) {
+  if (val <= 0.0)
+    return luma;
+  return luma + (luma > rnd.NextDouble() ? val : -val);
+}
+
 // сервый в RGB пейнта
 unsafe ColorBgra gray_to_rgb(double luma, byte alpha) {
   var ret = new ColorBgra();
+
   if (post_inversion_val)
     luma = 1.0 - luma;
+
   luma = gamma_processing(luma, post_gamma_mode);
+  luma = random_dither(luma, dither_val);
+
+  if (use_threashold_val)
+    luma = threshold(luma, threashold_val);
+
   ret.B = (byte)(clamp(luma * 255.0, 0.0, 255.0));
   ret.G = (byte)(clamp(luma * 255.0, 0.0, 255.0));
   ret.R = (byte)(clamp(luma * 255.0, 0.0, 255.0));
   ret.A = alpha;
+  
   return ret;
 }
 
@@ -149,7 +176,9 @@ unsafe double brightness(double luma, double val) {
   return luma + val;
 }
 
-unsafe void PreRender(Surface dst, Surface src) {}
+unsafe void PreRender(Surface dst, Surface src) {
+  rnd = new Random();
+}
 
 unsafe void Render(Surface dst, Surface src, Rectangle rect) {
   for (int y = rect.Top; y < rect.Bottom; y++) {
@@ -168,4 +197,3 @@ unsafe void Render(Surface dst, Surface src, Rectangle rect) {
     }
   }
 }
-
