@@ -17,6 +17,6 @@
 [Счета для доната](donate.md)
 
 ### Copyright
-© 2024, [HPW-dev](mailto:hpwdev0@gmail.com)
+© 2022-2025, [HPW-dev](mailto:hpwdev0@gmail.com)
 
 Лицензия на код: [Apache 2.0](LICENSE.txt)
