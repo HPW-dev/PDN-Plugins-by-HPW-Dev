@@ -1,0 +1,3 @@
+FFffffff
+FFFF0000
+FF000000
