@@ -2,7 +2,7 @@
 // Submenu: Color
 // Author: HPW-Dev
 // Title: color quantize and dither
-// Version: 3.0.0
+// Version: 3.1
 // Desc: AdvDith + Quant
 // Keywords: contrast|quantization|desaturation|dithering|monochrome|color
 // URL: https://github.com/HPW-dev/PDN-Plugins-by-HPW-Dev
@@ -23,7 +23,7 @@ IntSliderControl m_post_luma = 0; // [-255,255] post-brightness
 IntSliderControl m_contrast = 0; // [-255,255] pre-contrast
 IntSliderControl m_post_contrast = 0; // [-255,255] post-contrast
 ListBoxControl m_dither = 5; // dither|disabled|ordered 2x2|ordered 3x3|ordered 4x4|ordered 8x8|ordered 16x16|line vertical|line horizontal|Floyd-Steinberg|Floyd false|Jarvis-Judice-Ninke|Stucki|Burkes|Sierra3|Sierra2|Sierra2-4A|Atkinson|random
-DoubleSliderControl m_dither_mul = 1; // [0,10] dither power
+DoubleSliderControl m_dither_mul = 1; // [0,66] dither power
 ListBoxControl m_error = 0; // error search func|difference|difference sum|average
 CheckboxControl m_use_alpha = true; // use alpha channel
 CheckboxControl use_gamma_corr = true; // use gamma correction
@@ -1290,8 +1290,8 @@ protected override void OnRender(IBitmapEffectOutput output) {
   RegionPtr<ColorBgra32> outputSubRegion = outputLock.AsRegionPtr();
   var outputRegion = outputSubRegion.OffsetView(-outputBounds.Location);
 
-  var img_max_x = (int)(outputBounds.Right - outputBounds.Left);
-  var img_max_y = (int)(outputBounds.Bottom - outputBounds.Top);
+  var img_max_x = (int)(outputBounds.Right - outputBounds.Left)+1;
+  var img_max_y = (int)(outputBounds.Bottom - outputBounds.Top)+1;
   var left = (int)(outputBounds.Left);
   var top = (int)(outputBounds.Top);
   var img_src = new Img(img_max_x, img_max_y);
