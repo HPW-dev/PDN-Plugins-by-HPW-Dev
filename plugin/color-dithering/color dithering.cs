@@ -2,14 +2,13 @@
 // Submenu: Color
 // Author: HPW-dev
 // Title: color quantize and dither
-// Version: 2.0
+// Version: 2.1
 // Desc: AdvDith + Quant
 // Keywords: contrast|quantization|desaturation|dithering|monochrome|color
 // URL: hpwdev0@gmail.com
-// Help: 2021-2024. Free
+// Help: 2021-2025. Free
 // Force Single Threaded
 
-// EN interface:
 #region UICode
 ListBoxControl m_find = 3; // color search mode|BT2001|BT601|Euclidean distance|difference|average|only red|only green|only blue
 ListBoxControl m_palette = 1; // {!m_use_file} palette|BW|3 bit|ZX Spectrum|MSX|Commodore 64|MAC 16 color|RGBI 3x level|RiscOS 16 color
@@ -25,27 +24,8 @@ ListBoxControl m_dither = 3; // dither|disabled|ordered 2x2|ordered 3x3|ordered 
 DoubleSliderControl m_dither_mul = 1; // [0,10] dither multipler
 ListBoxControl m_error = 0; // error search func|difference|difference sum|average
 CheckboxControl m_use_alpha = true; // use alpha channel
+CheckboxControl use_gamma_corr = true; // use gamma correction
 #endregion
-
-// RU interface:
-/*
-#region UICode
-ListBoxControl m_find = 3; // режим поиска цвета в палитре|BT2001|BT601|Евклидова дистанция|разница|среднее|только красный|только зелёный|только голубой
-ListBoxControl m_palette = 1; // {!m_use_file} палитра|BW|3-х битный цвет|ZX Spectrum|MSX|Commodore 64|MAC 16 color|RGBI 3x level|RiscOS 16 color
-CheckboxControl m_use_file = false; // использовать paint.net файл палитры
-FilenameControl m_fname = @""; // {m_use_file} |txt
-CheckboxControl m_use_adaptive = false; // использовать адаптивную палитру
-IntSliderControl m_col_count = 16; // [2,512] {m_use_adaptive} количество цветов
-IntSliderControl m_luma = 0; // [-255,255] яркость до
-IntSliderControl m_post_luma = 0; // [-255,255] яркость после
-IntSliderControl m_contrast = 0; // [-255,255] контраст до
-IntSliderControl m_post_contrast = 0; // [-255,255] контраст после
-ListBoxControl m_dither = 3; // алгоритм дизеринга|disabled|ordered 2x2|ordered 3x3|ordered 4x4|ordered 8x8|ordered 16x16|вертикальные линии|горизонтальные линии|Floyd-Steinberg|Floyd false|Jarvis-Judice-Ninke|Stucki|Burkes|Sierra3|Sierra2|Sierra2-4A|Atkinson|случайный шум
-DoubleSliderControl m_dither_mul = 1; // [0,10] параметр дизеринга
-ListBoxControl m_error = 0; // алгоритм поиска ошибки дизеринга|разница|сумма разницы|среднее
-CheckboxControl m_use_alpha = true; // использовать прозрачность
-#endregion
-*/
 
 // алгоритмы определения разницы в цветах
 enum find_e {
@@ -107,6 +87,19 @@ public static double clamp(double val, double min, double max) {
   return val;
 }
 
+// Гамма-коррекция (линейный → sRGB)
+unsafe static double linear_to_srgb(double c) {
+  return (c <= 0.0031308)
+    ? (12.92 * c)
+    : (1.055 * Math.Pow(c, 1.0 / 2.4) - 0.055);
+}
+
+unsafe static double srgb_to_linear(double c) {
+    return (c <= 0.04045)
+      ? (c / 12.92)
+      : (Math.Pow((c + 0.055) / 1.055, 2.4));
+}
+
 struct dRGB {
   public double r, g, b;
   // int to double (0..1)
@@ -115,27 +108,43 @@ struct dRGB {
   public static double b2d(byte val) { return (byte)val / 255.0; }
   public static uint d2u(double val) { return (uint)clamp(val * 255.0, 0.0, 255.0); }
   public static byte d2b(double val) { return (byte)clamp(val * 255.0, 0.0, 255.0); }
-  public static dRGB make(uint bgra = 0) {
+  public static dRGB make(uint bgra, bool use_gamma_corr) {
     dRGB ret = new dRGB();
     ret.b = u2d(bgra & 0xFF);
     ret.g = u2d((bgra >> 8) & 0xFF);
     ret.r = u2d((bgra >> 16) & 0xFF);
+    if (use_gamma_corr) {
+      ret.b = srgb_to_linear(ret.b);
+      ret.g = srgb_to_linear(ret.g);
+      ret.r = srgb_to_linear(ret.r);
+    }
     return ret;
   }
-  public ColorBgra get_bgra() {
+  public ColorBgra get_bgra(bool use_gamma_corr) {
     ColorBgra ret = new ColorBgra();
-    ret.B = d2b(b);
-    ret.G = d2b(g);
-    ret.R = d2b(r);
+    if (use_gamma_corr) {
+      ret.B = d2b(linear_to_srgb(b));
+      ret.G = d2b(linear_to_srgb(g));
+      ret.R = d2b(linear_to_srgb(r));
+    } else {
+      ret.B = d2b(b);
+      ret.G = d2b(g);
+      ret.R = d2b(r);
+    }
     ret.A = 0xFF;
     return ret;
   }
-  public dRGB(double r_ = 0, double g_ = 0, double b_ = 0) {
+  public dRGB() {
+    r = 0;
+    g = 0;
+    b = 0;
+  }
+  public dRGB(double r_, double g_, double b_) {
     r = r_;
     g = g_;
     b = b_;
   }
-  public dRGB(uint bgra) { this = make(bgra); }
+  public dRGB(uint bgra, bool use_gamma_corr) { this = make(bgra, use_gamma_corr); }
   public static dRGB operator + (dRGB a, double val) {
     return new dRGB(
       a.r + val,
@@ -207,13 +216,13 @@ class Img {
   public int Y = 0;
   public dRGB[] buffer = null;
   public Img() {}
-  public Img(Surface src) {
+  public Img(Surface src, bool use_gamma_corr) {
     X = src.Width;
     Y = src.Height;
     buffer = new dRGB[X * Y];
     for (int y = 0; y < Y; y++)
     for (int x = 0; x < X; x++) {
-      fast_set(x, y, dRGB.make(src[x,y].Bgra));
+      fast_set(x, y, dRGB.make(src[x,y].Bgra, use_gamma_corr));
     }
   }
   ~Img() { buffer = null; }
@@ -241,10 +250,10 @@ class Img {
   public dRGB fast_get(int i)
     { return buffer[i]; }
   // перенос буфера в peint net полотно
-  public void write(Surface dst) {
+  public void write(Surface dst, bool use_gamma_corr) {
     for (int y = 0; y < Y; y++)
     for (int x = 0; x < X; x++)
-      dst[x,y] = fast_get(x,y).get_bgra();
+      dst[x,y] = fast_get(x,y).get_bgra(use_gamma_corr);
   }
   public dRGB get(int x, int y) {
     if (x < 0) x = 0;
@@ -293,7 +302,7 @@ dRGB str2col(string str) {
     bgra <<= 4;
     bgra |= hex2u(ch);
   }
-  return new dRGB(bgra);
+  return new dRGB(bgra, use_gamma_corr);
 }
 
 dRGB color_find_BT2001(dRGB src, Palette pal) {
@@ -522,8 +531,8 @@ Palette init_palette(Img src) {
       // инициализация чб палитры:
       pal.max = 2;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0] = new dRGB(0xFF000000); // чёрный
-      pal.ptr[1] = new dRGB(0xFFFFFFFF); // белый
+      pal.ptr[0] = new dRGB(0xFF000000, use_gamma_corr); // чёрный
+      pal.ptr[1] = new dRGB(0xFFFFFFFF, use_gamma_corr); // белый
       break;
     }
     case palette_e._3BIT:
@@ -531,149 +540,149 @@ Palette init_palette(Img src) {
       // инициализация простейшей палитры:
       pal.max = 8;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0] = new dRGB(0xFF000000); // чёрный
-      pal.ptr[1] = new dRGB(0xFFFF0000); // красный
-      pal.ptr[2] = new dRGB(0xFF00FF00); // зелёный
-      pal.ptr[3] = new dRGB(0xFFFFFF00); // жёлтый
-      pal.ptr[4] = new dRGB(0xFF0000FF); // синий
-      pal.ptr[5] = new dRGB(0xFFFF00FF); // фиолетовый
-      pal.ptr[6] = new dRGB(0xFF00FFFF); // бирюзовый
-      pal.ptr[7] = new dRGB(0xFFFFFFFF); // белый
+      pal.ptr[0] = new dRGB(0xFF000000, use_gamma_corr); // чёрный
+      pal.ptr[1] = new dRGB(0xFFFF0000, use_gamma_corr); // красный
+      pal.ptr[2] = new dRGB(0xFF00FF00, use_gamma_corr); // зелёный
+      pal.ptr[3] = new dRGB(0xFFFFFF00, use_gamma_corr); // жёлтый
+      pal.ptr[4] = new dRGB(0xFF0000FF, use_gamma_corr); // синий
+      pal.ptr[5] = new dRGB(0xFFFF00FF, use_gamma_corr); // фиолетовый
+      pal.ptr[6] = new dRGB(0xFF00FFFF, use_gamma_corr); // бирюзовый
+      pal.ptr[7] = new dRGB(0xFFFFFFFF, use_gamma_corr); // белый
       return pal;
     } // _3BIT
     case palette_e.MSX: {
       pal.max = 15;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xFF3EB849);
-      pal.ptr[2]  = new dRGB(0xFF74D07D);
-      pal.ptr[3]  = new dRGB(0xFF5955E0);
-      pal.ptr[4]  = new dRGB(0xFF8076F1);
-      pal.ptr[5]  = new dRGB(0xFFB95E51);
-      pal.ptr[6]  = new dRGB(0xFF65DBEF);
-      pal.ptr[7]  = new dRGB(0xFFDB6559);
-      pal.ptr[8]  = new dRGB(0xFFFF897D);
-      pal.ptr[9]  = new dRGB(0xFFCCC35E);
-      pal.ptr[10] = new dRGB(0xFFDED087);
-      pal.ptr[11] = new dRGB(0xFF3AA241);
-      pal.ptr[12] = new dRGB(0xFFB766B5);
-      pal.ptr[13] = new dRGB(0xFFCCCCCC);
-      pal.ptr[14] = new dRGB(0xFFFFFFFF);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xFF3EB849, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xFF74D07D, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xFF5955E0, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xFF8076F1, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xFFB95E51, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xFF65DBEF, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xFFDB6559, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xFFFF897D, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xFFCCC35E, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xFFDED087, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xFF3AA241, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xFFB766B5, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xFFCCCCCC, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xFFFFFFFF, use_gamma_corr);
       return pal;
     } // MSX
     case palette_e.ZX_SPECTRUM: {
       pal.max = 15;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xFF001DC8);
-      pal.ptr[2]  = new dRGB(0xFF0027FB);
-      pal.ptr[3]  = new dRGB(0xFFD8240F);
-      pal.ptr[4]  = new dRGB(0xFFFF3016);
-      pal.ptr[5]  = new dRGB(0xFFD530C9);
-      pal.ptr[6]  = new dRGB(0xFFFF3FFC);
-      pal.ptr[7]  = new dRGB(0xFF00C721);
-      pal.ptr[8]  = new dRGB(0xFF00F92C);
-      pal.ptr[9]  = new dRGB(0xFF00C9CB);
-      pal.ptr[10] = new dRGB(0xFF00FCFE);
-      pal.ptr[11] = new dRGB(0xFFCEC927);
-      pal.ptr[12] = new dRGB(0xFFFFFD33);
-      pal.ptr[13] = new dRGB(0xFFCBCBCB);
-      pal.ptr[14] = new dRGB(0xFFFFFFFF);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xFF001DC8, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xFF0027FB, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xFFD8240F, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xFFFF3016, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xFFD530C9, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xFFFF3FFC, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xFF00C721, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xFF00F92C, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xFF00C9CB, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xFF00FCFE, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xFFCEC927, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xFFFFFD33, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xFFCBCBCB, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xFFFFFFFF, use_gamma_corr);
       return pal;
     } // ZX_SPECTRUM
     case palette_e.COMMODORE64: {
       pal.max = 16;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xff626262);
-      pal.ptr[2]  = new dRGB(0xff898989);
-      pal.ptr[3]  = new dRGB(0xffadadad);
-      pal.ptr[4]  = new dRGB(0xffffffff);
-      pal.ptr[5]  = new dRGB(0xff9f4e44);
-      pal.ptr[6]  = new dRGB(0xffcb7e75);
-      pal.ptr[7]  = new dRGB(0xff6d5412);
-      pal.ptr[8]  = new dRGB(0xffa1683c);
-      pal.ptr[9]  = new dRGB(0xffc9d487);
-      pal.ptr[10] = new dRGB(0xff9ae29b);
-      pal.ptr[11] = new dRGB(0xff5cab5e);
-      pal.ptr[12] = new dRGB(0xff6abfc6);
-      pal.ptr[13] = new dRGB(0xff887ecb);
-      pal.ptr[14] = new dRGB(0xff50459b);
-      pal.ptr[15] = new dRGB(0xffa057a3);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xff626262, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xff898989, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xffadadad, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xffffffff, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xff9f4e44, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xffcb7e75, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xff6d5412, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xffa1683c, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xffc9d487, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xff9ae29b, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xff5cab5e, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xff6abfc6, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xff887ecb, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xff50459b, use_gamma_corr);
+      pal.ptr[15] = new dRGB(0xffa057a3, use_gamma_corr);
       return pal;
     } // COMMODORE64
     case palette_e.MAC_16COL: {
       pal.max = 16;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xFF663300);
-      pal.ptr[2]  = new dRGB(0xFFDD0000);
-      pal.ptr[3]  = new dRGB(0xFF006600);
-      pal.ptr[4]  = new dRGB(0xFF00AA00);
-      pal.ptr[5]  = new dRGB(0xFF330099);
-      pal.ptr[6]  = new dRGB(0xFF0000CC);
-      pal.ptr[7]  = new dRGB(0xFF444444);
-      pal.ptr[8]  = new dRGB(0xFF0099FF);
-      pal.ptr[9]  = new dRGB(0xFFFF0099);
-      pal.ptr[10] = new dRGB(0xFF996633);
-      pal.ptr[11] = new dRGB(0xFFFFFF00);
-      pal.ptr[12] = new dRGB(0xFF888888);
-      pal.ptr[13] = new dRGB(0xFFBBBBBB);
-      pal.ptr[14] = new dRGB(0xFFFFFFFF);
-      pal.ptr[15] = new dRGB(0xFFFF6600);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xFF663300, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xFFDD0000, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xFF006600, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xFF00AA00, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xFF330099, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xFF0000CC, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xFF444444, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xFF0099FF, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xFFFF0099, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xFF996633, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xFFFFFF00, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xFF888888, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xFFBBBBBB, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xFFFFFFFF, use_gamma_corr);
+      pal.ptr[15] = new dRGB(0xFFFF6600, use_gamma_corr);
       return pal;
     } // MAC_16COL
     case palette_e.RGBI_3LEVEL: {
       pal.max = 27;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xFF910000);
-      pal.ptr[2]  = new dRGB(0xFFFF0000);
-      pal.ptr[3]  = new dRGB(0xFF009100);
-      pal.ptr[4]  = new dRGB(0xFF00FF00);
-      pal.ptr[5]  = new dRGB(0xFF000091);
-      pal.ptr[6]  = new dRGB(0xFF0000FF);
-      pal.ptr[7]  = new dRGB(0xFF009191);
-      pal.ptr[8]  = new dRGB(0xFF00FFFF);
-      pal.ptr[9]  = new dRGB(0xFF910091);
-      pal.ptr[10] = new dRGB(0xFFFF00FF);
-      pal.ptr[11] = new dRGB(0xFF919100);
-      pal.ptr[12] = new dRGB(0xFFFFFF00);
-      pal.ptr[13] = new dRGB(0xFF919191);
-      pal.ptr[14] = new dRGB(0xFFFFFFFF);
-      pal.ptr[15] = new dRGB(0xFFFF9100);
-      pal.ptr[16] = new dRGB(0xFF91FF00);
-      pal.ptr[17] = new dRGB(0xFFFF0091);
-      pal.ptr[18] = new dRGB(0xFF00FF91);
-      pal.ptr[19] = new dRGB(0xFF9100FF);
-      pal.ptr[20] = new dRGB(0xFF0091FF);
-      pal.ptr[21] = new dRGB(0xFFFF9191);
-      pal.ptr[22] = new dRGB(0xFFFFFF91);
-      pal.ptr[23] = new dRGB(0xFF91FF91);
-      pal.ptr[24] = new dRGB(0xFF91FFFF);
-      pal.ptr[25] = new dRGB(0xFF9191FF);
-      pal.ptr[26] = new dRGB(0xFFFF91FF);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xFF910000, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xFFFF0000, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xFF009100, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xFF00FF00, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xFF000091, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xFF0000FF, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xFF009191, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xFF00FFFF, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xFF910091, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xFFFF00FF, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xFF919100, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xFFFFFF00, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xFF919191, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xFFFFFFFF, use_gamma_corr);
+      pal.ptr[15] = new dRGB(0xFFFF9100, use_gamma_corr);
+      pal.ptr[16] = new dRGB(0xFF91FF00, use_gamma_corr);
+      pal.ptr[17] = new dRGB(0xFFFF0091, use_gamma_corr);
+      pal.ptr[18] = new dRGB(0xFF00FF91, use_gamma_corr);
+      pal.ptr[19] = new dRGB(0xFF9100FF, use_gamma_corr);
+      pal.ptr[20] = new dRGB(0xFF0091FF, use_gamma_corr);
+      pal.ptr[21] = new dRGB(0xFFFF9191, use_gamma_corr);
+      pal.ptr[22] = new dRGB(0xFFFFFF91, use_gamma_corr);
+      pal.ptr[23] = new dRGB(0xFF91FF91, use_gamma_corr);
+      pal.ptr[24] = new dRGB(0xFF91FFFF, use_gamma_corr);
+      pal.ptr[25] = new dRGB(0xFF9191FF, use_gamma_corr);
+      pal.ptr[26] = new dRGB(0xFFFF91FF, use_gamma_corr);
       return pal;
     } // RGBI_3LEVEL
     case palette_e.RISCOS_16COL: {
       pal.max = 16;
       pal.ptr = new dRGB[pal.max];
-      pal.ptr[0]  = new dRGB(0xFF000000);
-      pal.ptr[1]  = new dRGB(0xFFDD0000);
-      pal.ptr[2]  = new dRGB(0xFF558800);
-      pal.ptr[3]  = new dRGB(0xFF00CC00);
-      pal.ptr[4]  = new dRGB(0xFF004499);
-      pal.ptr[5]  = new dRGB(0xFF00BBFF);
-      pal.ptr[6]  = new dRGB(0xFFFFBB00);
-      pal.ptr[7]  = new dRGB(0xFFEEEE00);
-      pal.ptr[8]  = new dRGB(0xFF333333);
-      pal.ptr[9]  = new dRGB(0xFF555555);
-      pal.ptr[10] = new dRGB(0xFF777777);
-      pal.ptr[11] = new dRGB(0xFF999999);
-      pal.ptr[12] = new dRGB(0xFFBBBBBB);
-      pal.ptr[13] = new dRGB(0xFFDDDDDD);
-      pal.ptr[14] = new dRGB(0xFFFFFFFF);
-      pal.ptr[15] = new dRGB(0xFFEEEEBB);
+      pal.ptr[0]  = new dRGB(0xFF000000, use_gamma_corr);
+      pal.ptr[1]  = new dRGB(0xFFDD0000, use_gamma_corr);
+      pal.ptr[2]  = new dRGB(0xFF558800, use_gamma_corr);
+      pal.ptr[3]  = new dRGB(0xFF00CC00, use_gamma_corr);
+      pal.ptr[4]  = new dRGB(0xFF004499, use_gamma_corr);
+      pal.ptr[5]  = new dRGB(0xFF00BBFF, use_gamma_corr);
+      pal.ptr[6]  = new dRGB(0xFFFFBB00, use_gamma_corr);
+      pal.ptr[7]  = new dRGB(0xFFEEEE00, use_gamma_corr);
+      pal.ptr[8]  = new dRGB(0xFF333333, use_gamma_corr);
+      pal.ptr[9]  = new dRGB(0xFF555555, use_gamma_corr);
+      pal.ptr[10] = new dRGB(0xFF777777, use_gamma_corr);
+      pal.ptr[11] = new dRGB(0xFF999999, use_gamma_corr);
+      pal.ptr[12] = new dRGB(0xFFBBBBBB, use_gamma_corr);
+      pal.ptr[13] = new dRGB(0xFFDDDDDD, use_gamma_corr);
+      pal.ptr[14] = new dRGB(0xFFFFFFFF, use_gamma_corr);
+      pal.ptr[15] = new dRGB(0xFFEEEEBB, use_gamma_corr);
       return pal;
     } // RISCOS_16COL
   } // switch pal mode
@@ -1113,7 +1122,7 @@ void add_alpha(Surface dst, Surface src) {
 void PreRender(Surface dst, Surface src) {}
 
 void Render(Surface dst, Surface src, Rectangle rect) {
-  Img img_src = new Img(src);
+  Img img_src = new Img(src, use_gamma_corr);
   img_src.colcor(dRGB.i2d(m_luma), m_contrast);
   Palette pal = init_palette(img_src);
   if (pal == null)
@@ -1143,7 +1152,7 @@ void Render(Surface dst, Surface src, Rectangle rect) {
     case dither_e.ATKINSON: dither_atkinson(img_src, pal); break;
     case dither_e.RANDOM: dither_random(img_src, pal); break;
   } // switch m_dither
-  img_src.write(dst);
+  img_src.write(dst, use_gamma_corr);
   if (m_use_alpha)
     add_alpha(dst, src);
 } // Render
