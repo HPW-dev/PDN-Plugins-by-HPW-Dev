@@ -1,16 +1,18 @@
 // Name: Color Dithering
 // Submenu: Color
-// Author: HPW-dev
+// Author: HPW-Dev
 // Title: color quantize and dither
-// Version: 2.1
+// Version: 2.1.0
 // Desc: AdvDith + Quant
 // Keywords: contrast|quantization|desaturation|dithering|monochrome|color
-// URL: hpwdev0@gmail.com
-// Help: 2021-2025. Free
-// Force Single Threaded
+// URL: https://github.com/HPW-dev/PDN-Plugins-by-HPW-Dev
+// Help: hpwdev0@gmail.com
+// forse singlethread
+
+// For help writing a Bitmap plugin: https://boltbait.com/pdn/CodeLab/help/tutorial/bitmap/
 
 #region UICode
-ListBoxControl m_find = 3; // color search mode|BT2001|BT601|Euclidean distance|difference|average|only red|only green|only blue
+ListBoxControl m_find = 2; // color search mode|BT2001|BT601|Euclidean distance|difference|average|only red|only green|only blue
 ListBoxControl m_palette = 1; // {!m_use_file} palette|BW|3 bit|ZX Spectrum|MSX|Commodore 64|MAC 16 color|RGBI 3x level|RiscOS 16 color
 CheckboxControl m_use_file = false; // use paint.net palette file
 FilenameControl m_fname = @""; // {m_use_file} |txt
@@ -20,8 +22,8 @@ IntSliderControl m_luma = 0; // [-255,255] pre-brightness
 IntSliderControl m_post_luma = 0; // [-255,255] post-brightness
 IntSliderControl m_contrast = 0; // [-255,255] pre-contrast
 IntSliderControl m_post_contrast = 0; // [-255,255] post-contrast
-ListBoxControl m_dither = 3; // dither|disabled|ordered 2x2|ordered 3x3|ordered 4x4|ordered 8x8|ordered 16x16|line vertical|line horizontal|Floyd-Steinberg|Floyd false|Jarvis-Judice-Ninke|Stucki|Burkes|Sierra3|Sierra2|Sierra2-4A|Atkinson|random
-DoubleSliderControl m_dither_mul = 1; // [0,10] dither multipler
+ListBoxControl m_dither = 5; // dither|disabled|ordered 2x2|ordered 3x3|ordered 4x4|ordered 8x8|ordered 16x16|line vertical|line horizontal|Floyd-Steinberg|Floyd false|Jarvis-Judice-Ninke|Stucki|Burkes|Sierra3|Sierra2|Sierra2-4A|Atkinson|random
+DoubleSliderControl m_dither_mul = 7; // [0,10] dither power
 ListBoxControl m_error = 0; // error search func|difference|difference sum|average
 CheckboxControl m_use_alpha = true; // use alpha channel
 CheckboxControl use_gamma_corr = true; // use gamma correction
@@ -215,7 +217,13 @@ class Img {
   public int X = 0;
   public int Y = 0;
   public dRGB[] buffer = null;
+
   public Img() {}
+  public Img(int x, int y) {
+    X = x;
+    Y = y;
+    buffer = new dRGB[X * Y];
+  }
   public Img(Surface src, bool use_gamma_corr) {
     X = src.Width;
     Y = src.Height;
@@ -249,12 +257,6 @@ class Img {
     { return buffer[y * X + x]; }
   public dRGB fast_get(int i)
     { return buffer[i]; }
-  // перенос буфера в peint net полотно
-  public void write(Surface dst, bool use_gamma_corr) {
-    for (int y = 0; y < Y; y++)
-    for (int x = 0; x < X; x++)
-      dst[x,y] = fast_get(x,y).get_bgra(use_gamma_corr);
-  }
   public dRGB get(int x, int y) {
     if (x < 0) x = 0;
     if (x >= X) x = X - 1;
@@ -1095,34 +1097,37 @@ void dither_random(Img dst, Palette pal) {
     if (IsCancelRequested) return;
     for (int x = 0; x < dst.X; x++) {
       var col = dst.fast_get(x, y);
-      col.r = col.r > (generator.NextDouble() * m_dither_mul) ? 1.0 : 0.0;
-      col.g = col.g > (generator.NextDouble() * m_dither_mul) ? 1.0 : 0.0;
-      col.b = col.b > (generator.NextDouble() * m_dither_mul) ? 1.0 : 0.0;
+      var power = clamp(m_dither_mul, -1, 1.5)-1.0;
+      col.r = ((col.r + power) > generator.NextDouble()) ? 1.0 : 0.0;
+      col.g = ((col.g + power) > generator.NextDouble()) ? 1.0 : 0.0;
+      col.b = ((col.b + power) > generator.NextDouble()) ? 1.0 : 0.0;
       dst.fast_set(x, y, accept_pal(col, pal));
     }
   }
 } // dither_random
 
-void add_alpha(Surface dst, Surface src) {
-  var X = src.Width;
-  var Y = src.Height;
-  for (int y = 0; y < Y; y++)
-  for (int x = 0; x < X; x++) {
-    var src_col = src[x,y].Bgra;
-    var dst_col = dst[x,y].Bgra;
-    var result = new ColorBgra();
-    result.A = (byte)((src_col >> 24) & 0xFF);
-    result.R = (byte)((dst_col >> 16) & 0xFF);
-    result.G = (byte)((dst_col >> 8) & 0xFF);
-    result.B = (byte)((dst_col >> 0) & 0xFF);
-    dst[x,y] = result;    
+protected override void OnRender(IBitmapEffectOutput output) {
+  using IEffectInputBitmap<ColorBgra32> sourceBitmap = Environment.GetSourceBitmapBgra32();
+  using IBitmapLock<ColorBgra32> sourceLock = sourceBitmap.Lock(new RectInt32(0, 0, sourceBitmap.Size));
+  RegionPtr<ColorBgra32> sourceRegion = sourceLock.AsRegionPtr();
+
+  RectInt32 outputBounds = output.Bounds;
+  using IBitmapLock<ColorBgra32> outputLock = output.LockBgra32();
+  RegionPtr<ColorBgra32> outputSubRegion = outputLock.AsRegionPtr();
+  var outputRegion = outputSubRegion.OffsetView(-outputBounds.Location);
+
+  var img_max_x = outputBounds.Right - outputBounds.Left;
+  var img_max_y = outputBounds.Bottom - outputBounds.Top;
+  var img_src = new Img(img_max_x, img_max_y);
+
+  for (int y = outputBounds.Top; y < outputBounds.Bottom; ++y) {
+    if (IsCancelRequested) return;
+    for (int x = outputBounds.Left; x < outputBounds.Right; ++x) {
+      var rgb = new dRGB(sourceRegion[x,y].Bgra, use_gamma_corr);
+      img_src.set(x-outputBounds.Left, y-outputBounds.Top, rgb);
+    }
   }
-}
 
-void PreRender(Surface dst, Surface src) {}
-
-void Render(Surface dst, Surface src, Rectangle rect) {
-  Img img_src = new Img(src, use_gamma_corr);
   img_src.colcor(dRGB.i2d(m_luma), m_contrast);
   Palette pal = init_palette(img_src);
   if (pal == null)
@@ -1152,7 +1157,13 @@ void Render(Surface dst, Surface src, Rectangle rect) {
     case dither_e.ATKINSON: dither_atkinson(img_src, pal); break;
     case dither_e.RANDOM: dither_random(img_src, pal); break;
   } // switch m_dither
-  img_src.write(dst, use_gamma_corr);
-  if (m_use_alpha)
-    add_alpha(dst, src);
-} // Render
+  
+  for (int y = outputBounds.Top; y < outputBounds.Bottom; ++y) {
+    if (IsCancelRequested) return;
+    for (int x = outputBounds.Left; x < outputBounds.Right; ++x) {
+      outputRegion[x,y] = img_src.get(x-outputBounds.Left, y-outputBounds.Top).get_bgra(use_gamma_corr);
+      if (m_use_alpha)
+        outputRegion[x,y].A = sourceRegion[x,y].A;
+    }
+  }
+}
