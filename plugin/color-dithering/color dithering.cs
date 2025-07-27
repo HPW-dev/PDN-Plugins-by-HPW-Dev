@@ -23,7 +23,7 @@ IntSliderControl m_post_luma = 0; // [-255,255] post-brightness
 IntSliderControl m_contrast = 0; // [-255,255] pre-contrast
 IntSliderControl m_post_contrast = 0; // [-255,255] post-contrast
 ListBoxControl m_dither = 5; // dither|disabled|ordered 2x2|ordered 3x3|ordered 4x4|ordered 8x8|ordered 16x16|line vertical|line horizontal|Floyd-Steinberg|Floyd false|Jarvis-Judice-Ninke|Stucki|Burkes|Sierra3|Sierra2|Sierra2-4A|Atkinson|random
-DoubleSliderControl m_dither_mul = 7; // [0,10] dither power
+DoubleSliderControl m_dither_mul = 1; // [0,10] dither power
 ListBoxControl m_error = 0; // error search func|difference|difference sum|average
 CheckboxControl m_use_alpha = true; // use alpha channel
 CheckboxControl use_gamma_corr = true; // use gamma correction
@@ -871,7 +871,7 @@ void dither_stucki(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (8.0/42.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (4.0/42.0));
 
@@ -929,7 +929,7 @@ void dither_floyd(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (7.0/16.0));
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * (3.0/16.0));
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * (5.0/16.0));
@@ -947,7 +947,7 @@ void dither_floyd_false(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * 3 * 0.125); // 0.125 = 1/8
       buffer.set(x+1, y+1, buffer.get(x+1, y+1) + q_error * 2 * 0.125);
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * 3 * 0.125);
@@ -964,7 +964,7 @@ void dither_jarvis(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (7.0/48.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (5.0/48.0));
 
@@ -992,7 +992,7 @@ void dither_burkes(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (8.0/32.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (4.0/32.0));
 
@@ -1014,7 +1014,7 @@ void dither_sierra3(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (5.0/32.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (3.0/32.0));
       
@@ -1040,7 +1040,7 @@ void dither_sierra2(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (4.0/16.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (3.0/16.0));
 
@@ -1062,7 +1062,7 @@ void dither_sierra2_4a(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (2.0/4.0));
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * (1.0/4.0));
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * (1.0/4.0));
@@ -1079,7 +1079,7 @@ void dither_atkinson(Img dst, Palette pal) {
       dRGB old_pixel = buffer.fast_get(x, y);
       dRGB new_pixel = accept_pal(old_pixel, pal);
       buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + m_dither_mul);
+      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * 0.125);
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * 0.125);
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * 0.125);
@@ -1097,7 +1097,7 @@ void dither_random(Img dst, Palette pal) {
     if (IsCancelRequested) return;
     for (int x = 0; x < dst.X; x++) {
       var col = dst.fast_get(x, y);
-      var power = clamp(m_dither_mul, -1, 1.5)-1.0;
+      var power = clamp(m_dither_mul, -1, 1.5) - 1.0;
       col.r = ((col.r + power) > generator.NextDouble()) ? 1.0 : 0.0;
       col.g = ((col.g + power) > generator.NextDouble()) ? 1.0 : 0.0;
       col.b = ((col.b + power) > generator.NextDouble()) ? 1.0 : 0.0;
@@ -1116,15 +1116,17 @@ protected override void OnRender(IBitmapEffectOutput output) {
   RegionPtr<ColorBgra32> outputSubRegion = outputLock.AsRegionPtr();
   var outputRegion = outputSubRegion.OffsetView(-outputBounds.Location);
 
-  var img_max_x = outputBounds.Right - outputBounds.Left;
-  var img_max_y = outputBounds.Bottom - outputBounds.Top;
+  var img_max_x = (int)(outputBounds.Right - outputBounds.Left);
+  var img_max_y = (int)(outputBounds.Bottom - outputBounds.Top);
+  var left = (int)(outputBounds.Left);
+  var top = (int)(outputBounds.Top);
   var img_src = new Img(img_max_x, img_max_y);
 
   for (int y = outputBounds.Top; y < outputBounds.Bottom; ++y) {
     if (IsCancelRequested) return;
     for (int x = outputBounds.Left; x < outputBounds.Right; ++x) {
       var rgb = new dRGB(sourceRegion[x,y].Bgra, use_gamma_corr);
-      img_src.set(x-outputBounds.Left, y-outputBounds.Top, rgb);
+      img_src.fast_set(x-left, y-top, rgb);
     }
   }
 
@@ -1161,7 +1163,7 @@ protected override void OnRender(IBitmapEffectOutput output) {
   for (int y = outputBounds.Top; y < outputBounds.Bottom; ++y) {
     if (IsCancelRequested) return;
     for (int x = outputBounds.Left; x < outputBounds.Right; ++x) {
-      outputRegion[x,y] = img_src.get(x-outputBounds.Left, y-outputBounds.Top).get_bgra(use_gamma_corr);
+      outputRegion[x,y] = img_src.fast_get(x-left, y-top).get_bgra(use_gamma_corr);
       if (m_use_alpha)
         outputRegion[x,y].A = sourceRegion[x,y].A;
     }
