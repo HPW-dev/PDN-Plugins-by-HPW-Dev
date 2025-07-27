@@ -2,7 +2,7 @@
 // Submenu: Color
 // Author: HPW-Dev
 // Title: color quantize and dither
-// Version: 2.1.0
+// Version: 3.0.0
 // Desc: AdvDith + Quant
 // Keywords: contrast|quantization|desaturation|dithering|monochrome|color
 // URL: https://github.com/HPW-dev/PDN-Plugins-by-HPW-Dev
@@ -12,7 +12,7 @@
 // For help writing a Bitmap plugin: https://boltbait.com/pdn/CodeLab/help/tutorial/bitmap/
 
 #region UICode
-ListBoxControl m_find = 2; // color search mode|BT2001|BT601|Euclidean distance|difference|average|only red|only green|only blue
+ListBoxControl m_find = 2; // color search mode|BT2001|BT601|Euclidean distance|difference|CIEALB dE00|CIEALB dE2000|average|only red|only green|only blue
 ListBoxControl m_palette = 1; // {!m_use_file} palette|BW|3 bit|ZX Spectrum|MSX|Commodore 64|MAC 16 color|RGBI 3x level|RiscOS 16 color
 CheckboxControl m_use_file = false; // use paint.net palette file
 FilenameControl m_fname = @""; // {m_use_file} |txt
@@ -35,6 +35,8 @@ enum find_e {
   BT601,
   EUCLIDE,
   DIFFERENCE,
+  CIEALB_DE00,
+  CIEALB_DE2000,
   AVERAGE,
   ONLY_RED,
   ONLY_GREEN,
@@ -353,7 +355,7 @@ dRGB color_find_EUCLIDE(dRGB src, Palette pal) {
     }
   } // for max pal
   return pal.ptr[best_color];
-} // color_find_EUCLIDE
+}
 
 dRGB color_find_DIFFERENCE(dRGB src, Palette pal) {
   /* Проход по всем цветам палитры и вычисление схожести
@@ -373,6 +375,176 @@ dRGB color_find_DIFFERENCE(dRGB src, Palette pal) {
   }
   return pal.ptr[index];
 } // color_find_DIFFERENCE
+
+unsafe static double degrees_to_radians(double deg) {
+  return deg * (Math.PI / 180.0);
+}
+
+unsafe static double radians_to_degrees(double rad) {
+  return rad * (180.0 / Math.PI);
+}
+
+unsafe static double lab_f(double t) {
+  return (t > 0.008856)
+    ? (Math.Pow(t, 1.0 / 3.0))
+    : ((7.787 * t) + (16.0 / 116.0));
+}
+
+class Lab {
+  public double L, a, b;
+
+  unsafe public Lab() { L = 0; a = 0; b = 0; }
+  unsafe public Lab(double _L, double _a, double _b) { L = _L; a = _a; b = _b; }
+  unsafe public Lab(dRGB src) {
+    // Матричное преобразование rgb -> XYZ
+    var x = 0.4124564 * src.r + 0.3575761 * src.g + 0.1804375 * src.b;
+    var y = 0.2126729 * src.r + 0.7151522 * src.g + 0.0721750 * src.b;
+    var z = 0.0193339 * src.r + 0.1191920 * src.g + 0.9503041 * src.b;
+
+    // Нормализация XYZ к белой точке D65
+    double x_n = x / 0.95047;
+    double y_n = y / 1.00000;
+    double z_n = z / 1.08883;
+
+    // XYZ → Lab
+    double fx = lab_f(x_n);
+    double fy = lab_f(y_n);
+    double fz = lab_f(z_n);
+
+    L = 116.0 * fy - 16.0;
+    a = 500.0 * (fx - fy);
+    b = 200.0 * (fy - fz);
+  }
+};
+
+// Разница в цвете CIELAB ΔE00
+static unsafe double deltaE00(Lab a, Lab b) {
+  return Math.Sqrt(Math.Pow(a.L-b.L, 2.0) + Math.Pow(a.a-b.a, 2.0) + Math.Pow(a.b-b.b, 2.0));
+}
+
+// Разница в цвете CIELAB ΔE2000
+static unsafe double deltaE2000(Lab lab1, Lab lab2) {
+    // Константы
+    const double kL = 1.0;
+    const double kC = 1.0;
+    const double kH = 1.0;
+
+    // 1. Вычисление средних значений
+    double L_prime_avg = (lab1.L + lab2.L) * 0.5;
+    double C1 = Math.Sqrt(lab1.a * lab1.a + lab1.b * lab1.b);
+    double C2 = Math.Sqrt(lab2.a * lab2.a + lab2.b * lab2.b);
+    double C_avg = (C1 + C2) * 0.5;
+
+    // 2. Вычисление G и a'
+    double C_avg_pow7 = Math.Pow(C_avg, 7.0);
+    double G = 0.5 * (1.0 - Math.Sqrt(C_avg_pow7 / (C_avg_pow7 + 6103515625.0)));  // 25^7 = 6103515625
+    
+    double a1_prime = lab1.a * (1.0 + G);
+    double a2_prime = lab2.a * (1.0 + G);
+    
+    // 3. Вычисление C' и h'
+    double C1_prime = Math.Sqrt(a1_prime * a1_prime + lab1.b * lab1.b);
+    double C2_prime = Math.Sqrt(a2_prime * a2_prime + lab2.b * lab2.b);
+    double C_prime_avg = (C1_prime + C2_prime) * 0.5;
+    
+    double h1_prime = Math.Atan2(lab1.b, a1_prime);
+    double h2_prime = Math.Atan2(lab2.b, a2_prime);
+    
+    // Коррекция углов
+    if (Math.Abs(h1_prime - h2_prime) > Math.PI) {
+        if (h1_prime + h2_prime < 2 * Math.PI) {
+            h1_prime += 2 * Math.PI;
+        } else {
+            h2_prime += 2 * Math.PI;
+        }
+    }
+    
+    double h_prime_avg = (h1_prime + h2_prime) * 0.5;
+    
+    // 4. Вычисление ΔL', ΔC', ΔH'
+    double delta_L_prime = lab2.L - lab1.L;
+    double delta_C_prime = C2_prime - C1_prime;
+    
+    double delta_h_prime;
+    if (C1_prime * C2_prime == 0.0) {
+        delta_h_prime = 0.0;
+    } else if (Math.Abs(h2_prime - h1_prime) <= Math.PI) {
+        delta_h_prime = h2_prime - h1_prime;
+    } else if (h2_prime - h1_prime > Math.PI) {
+        delta_h_prime = h2_prime - h1_prime - 2 * Math.PI;
+    } else {
+        delta_h_prime = h2_prime - h1_prime + 2 * Math.PI;
+    }
+    
+    double delta_H_prime = 2 * Math.Sqrt(C1_prime * C2_prime) * Math.Sin(delta_h_prime / 2.0);
+    
+    // 5. Вычисление весовых коэффициентов
+    double T = 1.0 -
+      0.17 * Math.Cos(h_prime_avg - degrees_to_radians(30.0)) +
+      0.24 * Math.Cos(2.0 * h_prime_avg) +
+      0.32 * Math.Cos(3.0 * h_prime_avg + degrees_to_radians(6.0)) -
+      0.20 * Math.Cos(4.0 * h_prime_avg - degrees_to_radians(63.0));
+    
+    double S_L = 1.0 + (0.015 * (L_prime_avg - 50.0) * (L_prime_avg - 50.0)) /
+      Math.Sqrt(20.0 + (L_prime_avg - 50.0) * (L_prime_avg - 50.0));
+    
+    double S_C = 1.0 + 0.045 * C_prime_avg;
+    double S_H = 1.0 + 0.015 * C_prime_avg * T;
+    
+    // 6. Вычисление углового вращения
+    double h_prime_avg_deg = radians_to_degrees(h_prime_avg);
+    double delta_theta = degrees_to_radians(30.0) * 
+      Math.Exp(-((h_prime_avg_deg - 275.0) / 25.0) * 
+      ((h_prime_avg_deg - 275.0) / 25.0));
+    
+    double C_prime_avg_pow7 = Math.Pow(C_prime_avg, 7.0);
+    double R_C = 2.0 * Math.Sqrt(C_prime_avg_pow7 / (C_prime_avg_pow7 + 6103515625.0));
+    double R_T = -Math.Sin(2.0 * delta_theta) * R_C;
+    
+    // 7. Итоговый расчет ΔE00
+    double term1 = delta_L_prime / (kL * S_L);
+    double term2 = delta_C_prime / (kC * S_C);
+    double term3 = delta_H_prime / (kH * S_H);
+    
+    double delta_E = Math.Sqrt(term1 * term1 + 
+      term2 * term2 + 
+      term3 * term3 + 
+      R_T * term2 * term3);
+    
+    return delta_E;
+}
+
+static unsafe dRGB color_find_CIEALB_dE2000(dRGB src, Palette pal) {
+  /* Проход по всем цветам палитры и вычисление схожести
+  цвета с палитры с цветом картинки. Если current
+  меньше, то цвета более схожи. */
+  double total = deltaE2000(new Lab(new dRGB(255,255,255)), new Lab(new dRGB(0,0,0)));
+  int index = 0;
+  for (int i = 0; i < pal.max; ++i) {
+    double diff = deltaE2000(new Lab(pal.ptr[i]), new Lab(src));
+    if (total > diff) {
+      total = diff;
+      index = i;
+    }
+  }
+  return pal.ptr[index];
+}
+
+static unsafe dRGB color_find_CIEALB_dE00(dRGB src, Palette pal) {
+  /* Проход по всем цветам палитры и вычисление схожести
+  цвета с палитры с цветом картинки. Если current
+  меньше, то цвета более схожи. */
+  double total = deltaE00(new Lab(new dRGB(255,255,255)), new Lab(new dRGB(0,0,0)));
+  int index = 0;
+  for (int i = 0; i < pal.max; ++i) {
+    double diff = deltaE00(new Lab(pal.ptr[i]), new Lab(src));
+    if (total > diff) {
+      total = diff;
+      index = i;
+    }
+  }
+  return pal.ptr[index];
+}
 
 dRGB color_find_average(dRGB src, Palette pal) {
   double total = 1.0;
@@ -453,41 +625,41 @@ class CompareBlue: IComparer<dRGB> {
 } // CompareBlue
 
 // сортирует самый распространённый цветовой канал
-void proc_for_median_cut(List<dRGB> pixlist) {
+void proc_for_median_cut(List<dRGB> PIxlist) {
 // определение диапазона каналов:
   double r_min = 0, r_max = 1;
   double g_min = 0, g_max = 1;
   double b_min = 0, b_max = 1;
-  foreach (var pix in pixlist) {
-    r_min = Math.Min(r_min, pix.r); r_max = Math.Max(r_max, pix.r);
-    g_min = Math.Min(g_min, pix.g); g_max = Math.Max(g_max, pix.g);
-    b_min = Math.Min(b_min, pix.b); b_max = Math.Max(b_max, pix.b);
+  foreach (var PIx in PIxlist) {
+    r_min = Math.Min(r_min, PIx.r); r_max = Math.Max(r_max, PIx.r);
+    g_min = Math.Min(g_min, PIx.g); g_max = Math.Max(g_max, PIx.g);
+    b_min = Math.Min(b_min, PIx.b); b_max = Math.Max(b_max, PIx.b);
   }
   double r_range = r_max - r_min;
   double g_range = g_max - g_min;
   double b_range = b_max - b_min;
   if (r_range > g_range && r_range > b_range) // сортировка по красному каналу
-    pixlist.Sort(new CompareRed());
+    PIxlist.Sort(new CompareRed());
   else if (g_range > r_range && g_range > b_range) // сортировка по зелёному каналу
-    pixlist.Sort(new CompareGreen());
+    PIxlist.Sort(new CompareGreen());
   else // сортировка по синему каналу
-    pixlist.Sort(new CompareBlue());
-} // proc_for_median_cut
+    PIxlist.Sort(new CompareBlue());
+}
 
 // делает оптимальную палитру в зависимости от часто встречающихся пикселей
 void init_adaptive_pal(Palette pal, Img img, int color_count = 16) {
   pal.max = color_count;
   pal.ptr = new dRGB[color_count];
 // сохранение пикселей в списке
-  var pixlist = new List<dRGB>();
+  var PIxlist = new List<dRGB>();
   for (int i = 0; i < img.X * img.Y; ++i)
-    pixlist.Add(img.fast_get(i));
+    PIxlist.Add(img.fast_get(i));
 // просчитать границы списка для цветов
   var bound_list = new List<Tuple<int, int>>();
-  proc_for_median_cut(pixlist);
-  double mul = (double)pixlist.Count() / color_count;
+  proc_for_median_cut(PIxlist);
+  double mul = (double)PIxlist.Count() / color_count;
   for (int pal_index = 0; pal_index < color_count; ++pal_index)
-    pal.ptr[pal_index] = pixlist[(int)(pal_index * mul)];
+    pal.ptr[pal_index] = PIxlist[(int)(pal_index * mul)];
 } // init_adaptive_pal
 
 // палитра определяется через m_palette
@@ -702,6 +874,8 @@ dRGB accept_pal(dRGB col, Palette pal) {
     case find_e.ONLY_RED: { col = color_find_only_red(col, pal); break; }
     case find_e.ONLY_GREEN: { col = color_find_only_green(col, pal); break; }
     case find_e.ONLY_BLUE: { col = color_find_only_blue(col, pal); break; }
+    case find_e.CIEALB_DE00: { col = color_find_CIEALB_dE00(col, pal); break; }
+    case find_e.CIEALB_DE2000: { col = color_find_CIEALB_dE2000(col, pal); break; }
     default:
     case find_e.DIFFERENCE: { col = color_find_DIFFERENCE(col, pal); break; }
   } // m_find
@@ -868,10 +1042,10 @@ void dither_stucki(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (8.0/42.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (4.0/42.0));
 
@@ -926,10 +1100,10 @@ void dither_floyd(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (7.0/16.0));
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * (3.0/16.0));
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * (5.0/16.0));
@@ -944,10 +1118,10 @@ void dither_floyd_false(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * 3 * 0.125); // 0.125 = 1/8
       buffer.set(x+1, y+1, buffer.get(x+1, y+1) + q_error * 2 * 0.125);
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * 3 * 0.125);
@@ -961,10 +1135,10 @@ void dither_jarvis(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (7.0/48.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (5.0/48.0));
 
@@ -989,10 +1163,10 @@ void dither_burkes(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (8.0/32.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (4.0/32.0));
 
@@ -1011,10 +1185,10 @@ void dither_sierra3(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (5.0/32.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (3.0/32.0));
       
@@ -1037,10 +1211,10 @@ void dither_sierra2(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (4.0/16.0));
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * (3.0/16.0));
 
@@ -1059,10 +1233,10 @@ void dither_sierra2_4a(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * (2.0/4.0));
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * (1.0/4.0));
       buffer.set(x  , y+1, buffer.get(x  , y+1) + q_error * (1.0/4.0));
@@ -1076,10 +1250,10 @@ void dither_atkinson(Img dst, Palette pal) {
   for (int y = 0; y < buffer.Y; y++) {
     if (IsCancelRequested) return;
     for (int x = 0; x < buffer.X; x++) {
-      dRGB old_pixel = buffer.fast_get(x, y);
-      dRGB new_pixel = accept_pal(old_pixel, pal);
-      buffer.fast_set(x, y, new_pixel);
-      dRGB q_error = dither_error(old_pixel, new_pixel) / (1.0 + (1.0 / m_dither_mul));
+      dRGB old_PIxel = buffer.fast_get(x, y);
+      dRGB new_PIxel = accept_pal(old_PIxel, pal);
+      buffer.fast_set(x, y, new_PIxel);
+      dRGB q_error = dither_error(old_PIxel, new_PIxel) / (1.0 + (1.0 / m_dither_mul));
       buffer.set(x+1, y  , buffer.get(x+1, y  ) + q_error * 0.125);
       buffer.set(x+2, y  , buffer.get(x+2, y  ) + q_error * 0.125);
       buffer.set(x-1, y+1, buffer.get(x-1, y+1) + q_error * 0.125);
