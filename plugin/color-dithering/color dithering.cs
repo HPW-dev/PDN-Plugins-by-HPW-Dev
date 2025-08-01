@@ -7,7 +7,7 @@
 // Keywords: contrast|quantization|desaturation|dithering|monochrome|color
 // URL: https://github.com/HPW-dev/PDN-Plugins-by-HPW-Dev
 // Help: hpwdev0@gmail.com
-// forse singlethread
+// Force Single Threaded
 
 // For help writing a Bitmap plugin: https://boltbait.com/pdn/CodeLab/help/tutorial/bitmap/
 
